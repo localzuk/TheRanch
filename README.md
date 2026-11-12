@@ -224,6 +224,10 @@ include your Plasma and Qt versions and the output of
   (KDE's native pickers would open hidden behind the drawer), so they don't fully
   match the Plasma theme.
 
+## Copilot use
+
+- Copilot is only used for the desktop app to push the code to GitHub, for convenience.
+
 ## Licence
 
 Copyright © 2026 Tony Ayre <me@tonyayre.net>
