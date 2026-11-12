@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Tony Ayre <me@tonyayre.net>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[Desktop Entry]
+Type=Application
+Name=The Ranch
+GenericName=Desktop Icon Corrals
+Comment=Group desktop icons into titled, resizable corrals and edge drawers
+Exec=theranch
+Icon=view-grid-symbolic
+Categories=Qt;KDE;Utility;
+Keywords=desktop;icons;groups;fences;drawer;
+X-KDE-autostart-phase=2
+X-GNOME-SingleWindow=true
+Actions=NewCorral;
+
+[Desktop Action NewCorral]
+Name=New Corral
+Exec=theranch --new-corral
