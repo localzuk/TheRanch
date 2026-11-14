@@ -23,6 +23,7 @@
 #include "desktopstash.h"
 #include "foldermodel.h"
 #include "groupstore.h"
+#include "namefiltermodel.h"
 #include "pagemodel.h"
 #include "ranch.h"
 
@@ -87,6 +88,8 @@ int main(int argc, char **argv)
     const QCommandLineOption restoreDesktop(u"restore-desktop"_s,
                                             i18n("Put every corral's icons back on the desktop and quit."));
     parser.addOption(restoreDesktop);
+    const QCommandLineOption quickOpen(u"quick-open"_s, i18n("Show or hide the quick-open popup of every corral's icons."));
+    parser.addOption(quickOpen);
     about.setupCommandLine(&parser);
     parser.process(app);
     about.processCommandLine(&parser);
@@ -142,10 +145,18 @@ int main(int argc, char **argv)
 
     auto *ranch = new Ranch(store, &app);
 
-    QObject::connect(&service, &KDBusService::activateRequested, ranch, [ranch](const QStringList &args, const QString &) {
-        if (args.contains(u"--restore-desktop"_s)) {
+    QObject::connect(&service, &KDBusService::activateRequested, ranch, [ranch, &quickOpen, &newCorral, &restoreDesktop](const QStringList &args, const QString &) {
+        // A second `theranch …` was started; it passes its arguments here and exits.
+        QCommandLineParser remote;
+        remote.addOption(quickOpen);
+        remote.addOption(newCorral);
+        remote.addOption(restoreDesktop);
+        remote.parse(args);
+        if (remote.isSet(restoreDesktop)) {
             QCoreApplication::quit(); // aboutToQuit parks
-        } else if (args.contains(u"--new-corral"_s)) {
+        } else if (remote.isSet(quickOpen)) {
+            ranch->toggleQuickOpen();
+        } else if (remote.isSet(newCorral)) {
             ranch->setDrawMode(true);
         } else {
             ranch->setAllHidden(false);
@@ -158,6 +169,7 @@ int main(int argc, char **argv)
     qmlRegisterSingletonInstance("org.theranch.core", 1, 0, "Corrals", store);
     qmlRegisterType<FolderModel>("org.theranch.core", 1, 0, "FolderModel");
     qmlRegisterType<PageModel>("org.theranch.core", 1, 0, "PageModel");
+    qmlRegisterType<NameFilterModel>("org.theranch.core", 1, 0, "NameFilterModel");
 
     QQmlApplicationEngine engine;
     KLocalization::setupLocalizedContext(&engine); // makes i18n() available in QML
@@ -169,6 +181,9 @@ int main(int argc, char **argv)
     // Only after QML has loaded, so the pasture windows exist to show the draw overlay.
     if (parser.isSet(newCorral)) {
         ranch->setDrawMode(true);
+    }
+    if (parser.isSet(quickOpen)) {
+        ranch->toggleQuickOpen();
     }
     return app.exec();
 }

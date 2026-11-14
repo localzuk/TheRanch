@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // See ranch.h. Sections: state setters, layer-shell surfaces, file operations
-// (KIO), native menus and drags, then the tray icon and global shortcuts.
+// (KIO), native menus and drags, then the tray icon, global shortcuts and quick open.
 
 #include "ranch.h"
 #include "groupstore.h"
 
 #include <KAboutApplicationDialog>
 #include <KAboutData>
+#include <KActionCollection>
 #include <KFileItem>
 #include <KFileItemActions>
 #include <KFileItemListProperties>
@@ -20,6 +21,7 @@
 #include <KIO/RenameFileDialog>
 #include <KLocalizedString>
 #include <KPropertiesDialog>
+#include <KShortcutsDialog>
 #include <KStatusNotifierItem>
 #include <KUrlMimeData>
 #include <LayerShellQt/Window>
@@ -59,6 +61,35 @@ Ranch::Ranch(GroupStore *store, QObject *parent)
 {
     setupTray();
     setupShortcuts();
+}
+
+// ------------------------------------------------------------- quick open
+//
+// Quick open is a launcher-style popup: a separate window that lists every
+// corral's icons, one titled section per corral, centred on the active screen and
+// closed as soon as something is opened. It is deliberately *not* the corrals:
+// corrals and drawers never change layer or position because of it, and the popup
+// has its own look and type-to-filter, like an application launcher.
+
+void Ranch::toggleQuickOpen()
+{
+    m_quickOpenVisible = !m_quickOpenVisible;
+    Q_EMIT quickOpenVisibleChanged();
+}
+
+void Ranch::closeQuickOpen()
+{
+    if (m_quickOpenVisible) {
+        m_quickOpenVisible = false;
+        Q_EMIT quickOpenVisibleChanged();
+    }
+}
+
+// The quick-open key, shown as a hint beside the tray menu's Quick Open item.
+static QKeySequence firstShortcut(QAction *action)
+{
+    const QList<QKeySequence> keys = action ? KGlobalAccel::self()->shortcut(action) : QList<QKeySequence>{};
+    return keys.isEmpty() ? QKeySequence() : keys.first();
 }
 
 QUrl Ranch::desktopUrl() const
@@ -167,6 +198,23 @@ void Ranch::setInputRegion(QQuickWindow *window, const QVariantList &rects)
         region = QRegion(0, 0, 1, 1);
     }
     window->setMask(region);
+}
+
+void Ranch::configureQuickOpenLayer(QQuickWindow *window)
+{
+    auto *lsw = window ? LayerShellQt::Window::get(window) : nullptr;
+    if (!lsw) {
+        return;
+    }
+    // Whichever screen the user is working on, like KRunner.
+    lsw->setWantsToBeOnActiveScreen(true);
+    lsw->setScope(u"theranch-quickopen"_s);
+    lsw->setLayer(LayerShellQt::Window::LayerOverlay);
+    lsw->setAnchors(LayerShellQt::Window::Anchors(LayerShellQt::Window::AnchorTop | LayerShellQt::Window::AnchorBottom
+                                                  | LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorRight));
+    lsw->setExclusiveZone(-1); // cover panels too: the dimmed backdrop closes the popup when clicked
+    lsw->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityExclusive);
+    lsw->setActivateOnShow(true);
 }
 
 void Ranch::setExclusiveKeyboard(QQuickWindow *window, bool exclusive)
@@ -432,6 +480,8 @@ void Ranch::setupTray()
     connect(m_store, &QAbstractItemModel::modelReset, this, refresh);
     connect(this, &Ranch::allHiddenChanged, this, refresh);
     connect(this, &Ranch::allLockedChanged, this, refresh);
+    // Shortcuts changed in System Settings → Shortcuts.
+    connect(KGlobalAccel::self(), &KGlobalAccel::globalShortcutChanged, this, refresh);
     rebuildTrayMenu();
 }
 
@@ -532,6 +582,12 @@ void Ranch::rebuildTrayMenu()
         });
     }
 
+    // Quick open from the tray too, so the feature works without a shortcut.
+    if (!corrals.isEmpty() && m_quickOpenAction) {
+        auto *quick = menu->addAction(QIcon::fromTheme(u"quickopen"_s), i18n("Quick Open…"), this, &Ranch::toggleQuickOpen);
+        quick->setShortcut(firstShortcut(m_quickOpenAction)); // shown as a hint
+    }
+
     menu->addSeparator();
     auto *showAll = menu->addAction(QIcon::fromTheme(u"view-visible"_s), i18n("Show All Corrals"), this, [this] {
         setAllHidden(false);
@@ -579,6 +635,7 @@ void Ranch::rebuildTrayMenu()
         m_trayRefresh.start();
     });
 
+    menu->addAction(QIcon::fromTheme(u"configure-shortcuts"_s), i18n("Configure Shortcuts…"), this, &Ranch::showShortcutsDialog);
     menu->addAction(QIcon::fromTheme(u"folder-open"_s), i18n("Open Corrals Folder"), this, [this] {
         QDir().mkpath(GroupStore::ranchRoot());
         openFolder(QUrl::fromLocalFile(GroupStore::ranchRoot()));
@@ -591,7 +648,8 @@ void Ranch::rebuildTrayMenu()
 
 void Ranch::setupShortcuts()
 {
-    // Registered without default keys; users bind them in System Settings → Shortcuts.
+    // Registered without default keys; users bind them from the tray menu's
+    // Configure Shortcuts… or System Settings → Shortcuts.
     auto *toggle = new QAction(i18n("Show/Hide All Corrals"), this);
     toggle->setObjectName(u"toggle-all-corrals"_s);
     KGlobalAccel::self()->setGlobalShortcut(toggle, QList<QKeySequence>{});
@@ -605,6 +663,43 @@ void Ranch::setupShortcuts()
     connect(draw, &QAction::triggered, this, [this] {
         setDrawMode(true);
     });
+
+    m_quickOpenAction = new QAction(i18n("Quick Open"), this);
+    m_quickOpenAction->setObjectName(u"quick-open"_s);
+    KGlobalAccel::self()->setGlobalShortcut(m_quickOpenAction, QList<QKeySequence>{});
+    connect(m_quickOpenAction, &QAction::triggered, this, &Ranch::toggleQuickOpen);
+
+    // The same actions, gathered for the Configure Shortcuts dialog.
+    m_globalActions = new KActionCollection(this, QCoreApplication::applicationName());
+    m_globalActions->addAction(m_quickOpenAction->objectName(), m_quickOpenAction);
+    m_globalActions->addAction(toggle->objectName(), toggle);
+    m_globalActions->addAction(draw->objectName(), draw);
+
+    // Every action we use is registered above, so anything else stored for our
+    // component is stale (e.g. the per-corral "quick-open-<id>" entries of earlier
+    // builds) and can be dropped from System Settings.
+    KGlobalAccel::cleanComponent(QCoreApplication::applicationName());
+    m_trayRefresh.start(); // the tray menu shows the quick-open key loaded just now
+}
+
+// A plain top-level window (not a layer surface), so it stacks like any other
+// dialog. Opened from the tray, so it never has to compete with a drawer for focus.
+void Ranch::showShortcutsDialog()
+{
+    if (m_shortcutsDialog) {
+        m_shortcutsDialog->raise();
+        m_shortcutsDialog->activateWindow();
+        return;
+    }
+    // GlobalAction only: these actions have no in-app (local) shortcuts to show.
+    m_shortcutsDialog = new KShortcutsDialog(KShortcutsEditor::GlobalAction, KShortcutsEditor::LetterShortcutsDisallowed);
+    m_shortcutsDialog->setAttribute(Qt::WA_DeleteOnClose);
+    m_shortcutsDialog->setWindowTitle(i18n("Configure Shortcuts — The Ranch"));
+    m_shortcutsDialog->addCollection(m_globalActions, i18n("The Ranch"));
+    connect(m_shortcutsDialog, &KShortcutsDialog::saved, this, [this] {
+        m_trayRefresh.start(); // the Quick Open item shows its key
+    });
+    m_shortcutsDialog->configure(true); // non-modal: shows and returns
 }
 
 // KDE's standard About dialog (About / Author / Licence tabs and the bug-report

@@ -42,6 +42,7 @@ qt_add_executable(theranch
     src/groupstore.cpp   src/groupstore.h
     src/foldermodel.cpp  src/foldermodel.h
     src/pagemodel.cpp    src/pagemodel.h
+    src/namefiltermodel.cpp src/namefiltermodel.h
     src/desktopstash.cpp src/desktopstash.h
 )
 
@@ -63,6 +64,7 @@ qt_add_qml_module(theranch
         src/qml/BackgroundDialog.qml
         src/qml/IconPager.qml
         src/qml/IconDelegate.qml
+        src/qml/QuickOpenWindow.qml
 )
 
 # Single source of truth for the version shown by `theranch --version`.

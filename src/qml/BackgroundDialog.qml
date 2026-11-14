@@ -27,7 +27,11 @@ QQC2.Dialog {
     required property var host
 
     readonly property string corralId: corralModel.corralId
-    readonly property bool imageMode: corralModel.bgMode === "image"
+    // Image controls show when the corral uses an image, or as soon as the user picks
+    // "Image", *before* they choose a file, so the ideal size and shape are on screen
+    // while they decide. (The corral itself switches once a file is imported.)
+    property bool wantImage: false
+    readonly property bool imageMode: corralModel.bgMode === "image" || wantImage
 
     // ---------------------------------------------------- ideal image size
     // The ideal image is the corral's size in *physical* pixels (logical size ×
@@ -36,6 +40,20 @@ QQC2.Dialog {
     readonly property real dpr: body.screenDpr > 0 ? body.screenDpr : 1
     readonly property int idealWidth: Math.round(corral.width * dpr)
     readonly property int idealHeight: Math.round(corral.height * dpr)
+    // The ideal shape as a ratio people recognise: "3:2", "16:9" (within 2%), else
+    // "1.85:1". Portrait shapes read the other way round ("2:3").
+    readonly property string idealRatio: {
+        if (idealWidth <= 0 || idealHeight <= 0) return "";
+        const r = idealWidth / idealHeight;
+        const common = [[1, 1], [5, 4], [4, 3], [3, 2], [16, 10], [5, 3], [16, 9], [2, 1], [21, 9], [3, 1], [4, 1]];
+        for (const [a, b] of common) {
+            if (Math.abs(r - a / b) / (a / b) < 0.02) return i18nc("aspect ratio", "%1:%2", a, b);
+            if (Math.abs(r - b / a) / (b / a) < 0.02) return i18nc("aspect ratio", "%1:%2", b, a);
+        }
+        return r >= 1 ? i18nc("aspect ratio", "%1:1", r.toFixed(2)) : i18nc("aspect ratio", "1:%1", (1 / r).toFixed(2));
+    }
+    readonly property string idealShape: idealWidth > idealHeight * 1.02 ? i18n("landscape")
+                                         : idealHeight > idealWidth * 1.02 ? i18n("portrait") : i18n("square")
     readonly property int imageWidth: probe.status === Image.Ready ? probe.implicitWidth : 0
     readonly property int imageHeight: probe.status === Image.Ready ? probe.implicitHeight : 0
 
@@ -156,7 +174,8 @@ QQC2.Dialog {
         id: fileDialog
         options: dialog.inWindowPickers ? FileDialog.DontUseNativeDialog : 0
         popupType: QQC2.Popup.Item
-        title: i18n("Choose a Background Image")
+        // The guidance goes in the title too, so it's in view while browsing.
+        title: i18n("Choose a Background Image (ideal: %1 × %2 px, %3)", dialog.idealWidth, dialog.idealHeight, dialog.idealRatio)
         currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
         nameFilters: [i18n("Images (*.png *.jpg *.jpeg *.webp *.avif *.jxl *.bmp *.gif *.svg)"), i18n("All files (*)")]
         onAccepted: {
@@ -164,6 +183,7 @@ QQC2.Dialog {
                 errorLabel.text = i18n("Couldn't read that file.");
             } else {
                 errorLabel.text = "";
+                dialog.wantImage = false; // the corral is in image mode for real now
             }
         }
     }
@@ -225,7 +245,10 @@ QQC2.Dialog {
                     text: i18n("Colour")
                     checked: !dialog.imageMode
                     onToggled: {
-                        if (checked) dialog.set("bgMode", "color");
+                        if (checked) {
+                            dialog.wantImage = false;
+                            dialog.set("bgMode", "color");
+                        }
                         checked = Qt.binding(() => !dialog.imageMode);
                     }
                 }
@@ -234,8 +257,10 @@ QQC2.Dialog {
                     checked: dialog.imageMode
                     onToggled: {
                         if (checked) {
-                            // No image yet: the mode switches once one is imported.
-                            if (dialog.corralModel.bgImage.toString() === "") fileDialog.open();
+                            // No image yet: show the image controls (with the ideal
+                            // size) and let the user choose a file from there. The
+                            // corral switches once one is imported.
+                            if (dialog.corralModel.bgImage.toString() === "") dialog.wantImage = true;
                             else dialog.set("bgMode", "image");
                         }
                         checked = Qt.binding(() => dialog.imageMode);
@@ -264,6 +289,26 @@ QQC2.Dialog {
             }
 
             // -------------------------------------------------- image mode
+            ColumnLayout {
+                Kirigami.FormData.label: i18n("Ideal image:")
+                visible: dialog.imageMode
+                spacing: 0
+                QQC2.Label {
+                    text: i18nc("ideal image: width × height px, ratio, shape", "%1 × %2 px  ·  %3 %4",
+                                dialog.idealWidth, dialog.idealHeight, dialog.idealRatio, dialog.idealShape)
+                    font.bold: true
+                }
+                QQC2.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.7
+                    text: dialog.dpr !== 1
+                          ? i18n("This corral's size at your %1× display scale. An image this size or larger, in the same shape, fills it sharply without cropping. Updates if you resize the corral.", dialog.dpr)
+                          : i18n("This corral's size. An image this size or larger, in the same shape, fills it sharply without cropping. Updates if you resize the corral.")
+                }
+            }
+
             RowLayout {
                 Kirigami.FormData.label: i18n("Image:")
                 visible: dialog.imageMode
@@ -276,25 +321,6 @@ QQC2.Dialog {
                     id: errorLabel
                     color: Kirigami.Theme.negativeTextColor
                     visible: text !== ""
-                }
-            }
-
-            ColumnLayout {
-                Kirigami.FormData.label: i18n("Ideal size:")
-                visible: dialog.imageMode
-                spacing: 0
-                QQC2.Label {
-                    text: i18n("%1 × %2 px", dialog.idealWidth, dialog.idealHeight)
-                    font.bold: true
-                }
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.Wrap
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.7
-                    text: dialog.dpr !== 1
-                          ? i18n("This corral's size at your %1× display scale. Updates if you resize the corral.", dialog.dpr)
-                          : i18n("This corral's size. Updates if you resize the corral.")
                 }
             }
 

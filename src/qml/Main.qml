@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import QtQuick
+import org.theranch.core
 
 // Root of the UI. Creates two transparent layer surfaces per connected screen:
 //   PastureWindow: BOTTOM layer, above the Plasma desktop and below windows.
@@ -16,6 +17,9 @@ import QtQuick
 // between them is just a change to its `dock` or `screen` field.
 //
 // The Instantiator follows screen hot-plugging: windows come and go with monitors.
+//
+// Separately, a QuickOpenWindow exists only while the quick-open popup is showing
+// (Ranch.quickOpenVisible), on whichever screen is active.
 QtObject {
     id: root
 
@@ -37,5 +41,10 @@ QtObject {
                 topLayer: false
             }
         }
+    }
+
+    property Instantiator quickOpen: Instantiator {
+        active: Ranch.quickOpenVisible
+        delegate: QuickOpenWindow {}
     }
 }

@@ -7,7 +7,7 @@
 //  * turning windows into wlr-layer-shell surfaces and shaping their input region;
 //  * file operations through KIO (open, move, trash, native drag, the KDE file menu);
 //  * the notification-area icon (KStatusNotifierItem) and its menu;
-//  * global shortcuts (KGlobalAccel);
+//  * global shortcuts (KGlobalAccel), including the quick-open popup's;
 //  * app-wide UI state shared by every window: draw mode, hide-all, lock-all, and
 //    whether a native menu or drag is in progress (drawers stay open while it is).
 
@@ -22,6 +22,8 @@
 
 class GroupStore;
 class KAboutApplicationDialog;
+class KActionCollection;
+class KShortcutsDialog;
 class KStatusNotifierItem;
 class QAction;
 class QQuickItem;
@@ -43,6 +45,10 @@ class Ranch : public QObject
     // A drag started by us is in progress (same reason as nativeMenuOpen).
     Q_PROPERTY(bool dragging READ dragging NOTIFY draggingChanged)
     Q_PROPERTY(QUrl desktopUrl READ desktopUrl CONSTANT)
+    // The quick-open popup is showing. It's its own window (QuickOpenWindow.qml)
+    // listing every corral's icons in sections. Corrals themselves are never moved,
+    // raised or re-layered by it.
+    Q_PROPERTY(bool quickOpenVisible READ quickOpenVisible NOTIFY quickOpenVisibleChanged)
 
 public:
     explicit Ranch(GroupStore *store, QObject *parent = nullptr);
@@ -56,6 +62,12 @@ public:
     bool nativeMenuOpen() const { return m_nativeMenuOpen; }
     bool dragging() const { return m_dragging; }
     QUrl desktopUrl() const;
+    bool quickOpenVisible() const { return m_quickOpenVisible; }
+
+    // --- quick open -------------------------------------------------------
+    // Shows the quick-open popup, or closes it if it's showing (so the shortcut toggles).
+    Q_INVOKABLE void toggleQuickOpen();
+    Q_INVOKABLE void closeQuickOpen();
 
     // --- surfaces ---------------------------------------------------------
     // Turns a (not yet shown) window into a full-area layer surface on the named screen.
@@ -67,6 +79,10 @@ public:
     Q_INVOKABLE void setInputRegion(QQuickWindow *window, const QVariantList &rects);
     // Exclusive keyboard while drawing so Esc reaches us; on-demand otherwise.
     Q_INVOKABLE void setExclusiveKeyboard(QQuickWindow *window, bool exclusive);
+    // Turns a (not yet shown) window into the quick-open popup's surface: OVERLAY layer
+    // (above everything, full-screen windows included), on the screen that has focus,
+    // taking the keyboard so typing filters straight away.
+    Q_INVOKABLE void configureQuickOpenLayer(QQuickWindow *window);
 
     // --- files ------------------------------------------------------------
     // Opens a file or runs a .desktop launcher, with KDE's usual prompts.
@@ -88,6 +104,7 @@ Q_SIGNALS:
     void allLockedChanged();
     void nativeMenuOpenChanged();
     void draggingChanged();
+    void quickOpenVisibleChanged();
 
 private:
     void setupTray();
@@ -96,6 +113,9 @@ private:
     // m_trayRefresh, never from inside a menu action's own signal (it deletes them).
     void rebuildTrayMenu();
     void showAbout();
+    // KDE's shortcut editor, limited to our global shortcuts (Quick Open, Show/Hide
+    // All, Draw New Corral). Same settings as System Settings → Shortcuts.
+    void showShortcutsDialog();
     static QString autostartPath(); // ~/.config/autostart/org.theranch.desktop
     static bool autostartEnabled();
     static void setAutostartEnabled(bool enabled);
@@ -106,10 +126,14 @@ private:
     GroupStore *m_store;
     KStatusNotifierItem *m_tray = nullptr;
     QPointer<KAboutApplicationDialog> m_about; // null once the dialog is closed (deleted)
+    QPointer<KShortcutsDialog> m_shortcutsDialog; // likewise
+    KActionCollection *m_globalActions = nullptr; // our global-shortcut actions, for that dialog
     QTimer m_trayRefresh; // zero-delay single shot: coalesces bursts of changes into one rebuild
     bool m_drawMode = false;
     bool m_allHidden = false;
     bool m_allLocked = false;
     bool m_nativeMenuOpen = false;
     bool m_dragging = false;
+    bool m_quickOpenVisible = false;
+    QAction *m_quickOpenAction = nullptr; // its global shortcut
 };

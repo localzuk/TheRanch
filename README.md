@@ -14,12 +14,14 @@ Push one against a screen edge and it becomes a slide-out drawer.
   divider-style tab. Hover or click the tab to slide it out over your windows (or
   keep it below them, per drawer). Resize it in place, or tear it off again in one
   drag.
+- **Quick open:** one global shortcut pops up a launcher in the middle of the
+  screen, over your windows, with every corral's icons in a section per corral;
+  type to filter, then click or press Enter to open one.
 - **Hide anything:** individual corrals, or all of them, from the notification-area
   icon or a global shortcut.
 - **Never in the way when closed:** whenever The Ranch isn't running (quit, logout,
   crash), every icon goes back onto your normal desktop, and returns to its corral
   next time.
-
 
 ---
 
@@ -138,6 +140,26 @@ portal won't recognise the app. `install.sh` does this for you.
 
 Deleting a corral never deletes files. Its contents go back onto the desktop.
 
+### Quick open
+
+Set one global shortcut (tray menu → **Configure Shortcuts…**, or *System Settings →
+Keyboard → Shortcuts → The Ranch → Quick Open*). Pressing it pops up a
+launcher in the middle of the screen you're working on, above every window, listing
+the icons of all your corrals, each corral as its own titled section. The corrals
+themselves stay where they are.
+
+| Key | Does |
+|---|---|
+| Typing | Filter by name, across every corral (sections with no matches are hidden) |
+| Arrow keys, Tab, Page Up/Down | Move between icons, carrying on into the next or previous section |
+| Enter, or click | Open the icon and close the popup |
+| Esc | Clear the filter; press again to close |
+| The shortcut again, or click outside | Close |
+
+Hidden corrals are included, so a corral can live entirely behind the shortcut.
+Empty corrals are left out. The popup can also be opened from the tray menu's
+**Quick Open…**, or from a script or custom shortcut with `theranch --quick-open`.
+
 ### Tray icon (notification area)
 
 | Action | Does |
@@ -153,6 +175,7 @@ New Corral…
 ☑ Games                 ← one checkbox per corral: show/hide it
 ☑ Work (drawer)
 ☐ Recovered
+Quick Open…             ← every corral's icons in one launcher (shows the shortcut, if set)
 ───────────
 Show All Corrals        ← also brings back individually hidden corrals
 Hide All Corrals
@@ -161,14 +184,16 @@ Hide All Corrals
 Put All Drawers Above Windows  ← sets every drawer at once
 Put All Drawers Below Windows
 ☑ Start at Login
+Configure Shortcuts…    ← Quick Open, Show/Hide All Corrals, Draw New Corral
 Open Corrals Folder
 ───────────
 About The Ranch         ← version, author, licence and where to report bugs
 Quit
 ```
 
-Global shortcuts for **Show/Hide All Corrals** and **Draw New Corral** can be bound in
-*System Settings → Keyboard → Shortcuts → The Ranch*.
+Global shortcuts for **Quick Open**, **Show/Hide All Corrals** and **Draw New Corral**
+can be bound from the tray menu's **Configure Shortcuts…**, or in *System Settings →
+Keyboard → Shortcuts → The Ranch* (the same settings).
 
 ### When The Ranch isn't running
 
@@ -223,6 +248,19 @@ include your Plasma and Qt versions and the output of
 - Inside drawers that sit above windows, the colour and image pickers are Qt's own
   (KDE's native pickers would open hidden behind the drawer), so they don't fully
   match the Plasma theme.
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `src/main.cpp` | Start-up, single instance, start/stop lifecycle |
+| `src/ranch.*` | Layer-shell setup, input regions, file operations, tray icon, shortcuts |
+| `src/groupstore.*` | The list of corrals and their settings (JSON) |
+| `src/desktopstash.*` | Returning icons to the desktop when not running, and the crash guard |
+| `src/foldermodel.*`, `src/pagemodel.*`, `src/namefiltermodel.*` | Folder listing, pagination and quick-open filter models |
+| `src/qml/` | The user interface |
+| `install.sh`, `uninstall.sh` | Per-user install and removal |
+| `DESIGN.md` | Design notes and rationale |
 
 ## Copilot use
 
