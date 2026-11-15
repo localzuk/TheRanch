@@ -6,20 +6,20 @@
 Corral your KDE Plasma desktop icons into titled, coloured, resizable groups.
 Push one against a screen edge and it becomes a slide-out drawer.
 
-
-
 - **Corrals:** draw a rectangle on the desktop and drop icons into it. Each corral
   has its own title, background (a colour or an image with transparency and an
   optional colour overlay), icon size, and lock. Corrals keep the size you drew;
   icons that don't fit go onto further pages.
 
   ![Desktop Corrals](images/Corrals.png)
+
 - **Drawers:** drag a corral to a screen edge and it docks there as a drawer with a
   divider-style tab. Hover or click the tab to slide it out over your windows (or
   keep it below them, per drawer). Resize it in place, or tear it off again in one
   drag.
 
   ![Desktop Drawers](images/Tray.png)
+
 - **Quick open:** one global shortcut pops up a launcher in the middle of the
   screen, over your windows, with every corral's icons in a section per corral;
   type to filter, then click or press Enter to open one.
@@ -112,8 +112,9 @@ packages not found". Those are optional parts of Qt itself, not something The Ra
 needs, so they can be ignored.
 
 When installing by hand to a prefix whose `bin` isn't on `PATH` for your session,
-edit `Exec=` in the installed `org.theranch.desktop` to the full path, or the desktop
-portal won't recognise the app. `install.sh` does this for you.
+edit `Exec=` in the installed `org.theranch.desktop` to the full path (in double
+quotes if it contains spaces), or the desktop portal won't recognise the app.
+`install.sh` does this for you.
 
 ### Uninstall
 
@@ -128,8 +129,8 @@ portal won't recognise the app. `install.sh` does this for you.
 
 | Do this | To |
 |---|---|
-| Tray icon → **New Corral…** (or `theranch --new-corral`) then drag a rectangle | Create a corral |
-| Drag icons from the desktop / Dolphin onto it | Put them in it (desktop files move to `~/Desktop/.ranch/<id>/`; files from elsewhere are linked, never moved) |
+| Tray icon → **New Corral…** (or `theranch --new-corral`) then drag a rectangle | Create a corral. The drawing overlay appears above your windows; Esc, a right-click or the tray's **Cancel New Corral** backs out |
+| Drag icons from the desktop / Dolphin onto it | Put them in it (desktop files move to `~/Desktop/.ranch/<id>/`; files from anywhere else, network locations included, are linked, never moved) |
 | Drag an icon back out, or right-click → **Remove from Corral** | Return it to the desktop |
 | Drag the title bar (or the top grip when the title is hidden) | Move |
 | Drag an edge or corner | Resize |
@@ -144,7 +145,12 @@ portal won't recognise the app. `install.sh` does this for you.
 | Drawer ⋯ → **Drawer Stacking** | Above Windows / Below Windows, per drawer |
 | Mouse wheel, ‹ › arrows or page dots | Change page |
 
-Deleting a corral never deletes files. Its contents go back onto the desktop.
+Deleting a corral never deletes your files. Its contents go back onto the desktop.
+(The one thing that goes with it is `.directory`, the hidden file in which Dolphin
+keeps its view settings for the corral's folder.)
+
+Opening an executable script or program from a corral asks whether to open or run it
+first, as Dolphin does. Application launchers start directly.
 
 ### Quick open
 
@@ -171,12 +177,12 @@ Empty corrals are left out. The popup can also be opened from the tray menu's
 | Action | Does |
 |---|---|
 | Left-click | Hide / show all corrals |
-| Middle-click | Draw a new corral |
+| Middle-click | Draw a new corral (again to cancel) |
 | Hover | Tooltip with corral count and how many are hidden |
 | Right-click | The menu below |
 
 ```
-New Corral…
+New Corral…             ← reads "Cancel New Corral" while you're drawing one
 ───────────
 ☑ Games                 ← one checkbox per corral: show/hide it
 ☑ Work (drawer)
@@ -199,7 +205,8 @@ Quit
 
 Global shortcuts for **Quick Open**, **Show/Hide All Corrals** and **Draw New Corral**
 can be bound from the tray menu's **Configure Shortcuts…**, or in *System Settings →
-Keyboard → Shortcuts → The Ranch* (the same settings).
+Keyboard → Shortcuts → The Ranch* (the same settings). Each one toggles: pressing
+**Draw New Corral** again cancels the drawing.
 
 ### When The Ranch isn't running
 
@@ -207,7 +214,8 @@ Your desktop looks exactly as if corrals didn't exist. Whenever The Ranch stops,
 whether by quitting, logging out, a crash or being killed, every corral's icons go
 back onto the desktop. The next time it starts, they're gathered back into their
 corrals. Files you create on the desktop in the meantime are left alone, even if they
-share a name with something that was in a corral.
+share a name with something that was in a corral. Hidden files (names starting with a
+dot) inside a corral's folder are never icons, so they stay where they are.
 
 To put everything back on the desktop by hand (this also quits a running instance):
 
@@ -222,7 +230,7 @@ To put everything back on the desktop by hand (this also quits a running instanc
 | Path | What |
 |---|---|
 | `~/Desktop/.ranch/<id>/` | Each corral's files while The Ranch is running (Dolphin shows hidden folders with Ctrl+H) |
-| `~/.config/theranch/corrals.json` | Corral settings: titles, positions, sizes, backgrounds, docking |
+| `~/.config/theranch/corrals.json` | Corral settings: titles, positions, sizes, backgrounds, docking. If it can't be read at start-up, the unreadable file is kept beside it as `corrals.json.broken-<timestamp>` |
 | `~/.local/share/theranch/backgrounds/` | Copies of background images you've chosen |
 | `~/.local/state/theranch/` | Which corral each icon belongs to while The Ranch is closed (`parked.json`, plus a `.prev` backup) |
 | `~/.config/autostart/org.theranch.desktop` | Start at login (toggle from the tray menu) |
@@ -234,6 +242,10 @@ To put everything back on the desktop by hand (this also quits a running instanc
   `journalctl --user | grep "theranch:"`
 - **Icons missing from the desktop?** Run `theranch --restore-desktop`, or look in
   `~/Desktop/.ranch/` in Dolphin.
+- **Corrals came back as hidden "Recovered" ones with default settings?**
+  `corrals.json` couldn't be read (for example after a hand edit). Quit The Ranch, fix
+  the `corrals.json.broken-<timestamp>` copy next to it, and rename it back to
+  `corrals.json`.
 - **Plain-looking buttons and menus?** Install `qqc2-desktop-style`.
 - **Nothing appears at all?** Check you're in a Plasma *Wayland* session
   (`echo $XDG_SESSION_TYPE` should print `wayland`).
