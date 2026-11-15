@@ -53,6 +53,10 @@ Item {
 
     // While dragging/resizing we drive a local rect and commit it on release.
     property bool interacting: false
+    // Whether the pointer actually moved during this gesture. A plain click on the
+    // title bar is a press and release too, and must neither dock the corral (when
+    // it happens to sit at a screen edge) nor write anything to the store.
+    property bool dragged: false
     property rect liveRect
     property rect startRect
     property point startScene
@@ -139,10 +143,12 @@ Item {
         startRect = storedRect;
         liveRect = storedRect;
         startScene = scenePos;
+        dragged = false;
         interacting = true;
     }
 
     function moveTo(scenePos) {
+        dragged = true;
         const w = startRect.width, h = startRect.height;
         let nx = magnet(startRect.x + scenePos.x - startScene.x, w, linesX());
         let ny = magnet(startRect.y + scenePos.y - startScene.y, h, linesY());
@@ -155,8 +161,12 @@ Item {
     // Released on a screen edge → dock there as a drawer, remembering where along
     // the edge it was. The geometry is saved too, so undocking later puts it back.
     function endMove(scenePos) {
-        const edge = edgeAt(scenePos);
         host.dockHint = "";
+        if (!dragged) {
+            interacting = false;
+            return;
+        }
+        const edge = edgeAt(scenePos);
         if (edge !== "") {
             Corrals.setGeometry(corralId, liveRect.x, liveRect.y, liveRect.width, liveRect.height);
             Corrals.setValue(corralId, "dockOffset", (edge === "left" || edge === "right") ? liveRect.y : liveRect.x);
@@ -170,6 +180,7 @@ Item {
     // l/t/r/b say which edges this handle moves. Each moving edge snaps, then is
     // clamped to the screen and to the minimum size.
     function resizeTo(scenePos, l, t, r, b) {
+        dragged = true;
         const dx = scenePos.x - startScene.x, dy = scenePos.y - startScene.y;
         let x1 = startRect.x, y1 = startRect.y;
         let x2 = startRect.x + startRect.width, y2 = startRect.y + startRect.height;
@@ -181,7 +192,7 @@ Item {
     }
 
     function endResize() {
-        Corrals.setGeometry(corralId, liveRect.x, liveRect.y, liveRect.width, liveRect.height);
+        if (dragged) Corrals.setGeometry(corralId, liveRect.x, liveRect.y, liveRect.width, liveRect.height);
         interacting = false;
     }
 

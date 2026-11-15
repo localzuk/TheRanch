@@ -13,6 +13,7 @@
 
 #include <QAbstractListModel>
 #include <QColor>
+#include <QSize>
 #include <QTimer>
 #include <QUrl>
 
@@ -111,12 +112,20 @@ public:
     // Returns false if the file couldn't be read.
     Q_INVOKABLE bool importBackground(const QString &id, const QUrl &image);
 
-    // One-off bulk edit: writes `layer` ("top"/"bottom") into every corral's own
+    // The pixel size of an image file, read from its header (nothing is decoded).
+    // An invalid size (-1 × -1) if it can't be read.
+    Q_INVOKABLE QSize imageSize(const QUrl &image) const;
+
+    // One-off bulk edit: writes `layer` ("top"/"bottom") into every drawer's own
     // setting. Nothing keeps following it afterwards.
     Q_INVOKABLE void setAllDrawerLayers(const QString &layer);
 
     // Read-only access for C++ (the tray menu).
     const QList<Corral> &corrals() const { return m_corrals; }
+
+    // Ids become folder names under ranchRoot(), so anything that could point
+    // elsewhere (empty, a path separator, a leading dot) is refused.
+    static bool isValidId(const QString &id);
 
     static QString ranchRoot(); // ~/Desktop/.ranch
     static QString backgroundsDir(); // ~/.local/share/theranch/backgrounds
@@ -136,6 +145,8 @@ private:
     void pruneBackgrounds();
     void save() const;
     static QString configPath();
+    // `path` if it is a file directly inside backgroundsDir(), otherwise empty.
+    static QString ownedBackground(const QString &path);
 
     QList<Corral> m_corrals;
     QTimer m_saveTimer; // debounces writes (dragging emits many changes per second)

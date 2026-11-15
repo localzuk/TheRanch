@@ -531,6 +531,7 @@ Item {
             QQC2.Label {
                 id: tabLabel
                 text: drawer.title || i18n("Corral")
+                textFormat: Text.PlainText // names are data, never markup
                 color: "white"
                 font.bold: true
                 elide: Text.ElideRight

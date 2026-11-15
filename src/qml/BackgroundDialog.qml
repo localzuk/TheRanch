@@ -54,8 +54,11 @@ QQC2.Dialog {
     }
     readonly property string idealShape: idealWidth > idealHeight * 1.02 ? i18n("landscape")
                                          : idealHeight > idealWidth * 1.02 ? i18n("portrait") : i18n("square")
-    readonly property int imageWidth: probe.status === Image.Ready ? probe.implicitWidth : 0
-    readonly property int imageHeight: probe.status === Image.Ready ? probe.implicitHeight : 0
+    // The chosen image's own pixel size, read from the file's header in C++. (An
+    // Image element would have to decode the whole file just to report this.)
+    readonly property size naturalSize: Corrals.imageSize(corralModel.bgImage)
+    readonly property int imageWidth: Math.max(0, naturalSize.width)
+    readonly property int imageHeight: Math.max(0, naturalSize.height)
 
     // One-line verdict on how the chosen image will fit this corral, for the
     // current fit mode. Aspect ratios within 3% count as "the same shape". For
@@ -107,6 +110,12 @@ QQC2.Dialog {
     onRejected: {
         for (const k of keys) Corrals.setValue(corralId, k, snapshot[k]);
     }
+    // OK with nothing changed: the background was only switched on for the preview,
+    // so a corral that had it off gets it off again.
+    onAccepted: {
+        const changed = keys.some(k => k !== "showBackground" && String(valueOf(k)) !== String(snapshot[k]));
+        if (!changed) Corrals.setValue(corralId, "showBackground", snapshot.showBackground);
+    }
     onOpened: host.popupOpened()
     onClosed: host.popupClosed()
 
@@ -126,15 +135,6 @@ QQC2.Dialog {
     // is open so it's drawn on top instead of underneath.
     z: colorDialog.visible || fileDialog.visible ? -1 : 0
     standardButtons: QQC2.Dialog.Ok | QQC2.Dialog.Cancel
-
-    // Not displayed. Loads the chosen file at full size only to read its pixel
-    // dimensions (the visible Image in CorralBackground is scaled).
-    Image {
-        id: probe // reads the chosen image's natural size
-        visible: false
-        asynchronous: true
-        source: dialog.corralModel.bgImage
-    }
 
     // The native KDE file picker. The chosen file is copied into our data dir
     // (GroupStore::importBackground), which also switches the corral to image mode.
@@ -230,6 +230,7 @@ QQC2.Dialog {
                 QQC2.Label {
                     anchors { left: parent.left; top: parent.top; margins: Kirigami.Units.smallSpacing }
                     text: dialog.corralModel.title
+                    textFormat: Text.PlainText // names are data, never markup
                     color: "white"
                     font.bold: true
                 }

@@ -8,7 +8,8 @@ import org.theranch.core
 
 // The pasture: one per screen, a BOTTOM-layer surface covering the screen's
 // available area (above the Plasma desktop, below application windows). It holds
-// the free (undocked) corrals and the "draw a new corral" overlay.
+// the free (undocked) corrals and the "draw a new corral" overlay. Only while
+// drawing is it lifted above windows (Ranch.setDrawing), so the overlay is in view.
 //
 // Only the corrals' rectangles accept input (see maskTimer); clicks anywhere else
 // fall through to the Plasma desktop as if we weren't here.
@@ -101,7 +102,7 @@ Window {
     Connections {
         target: Ranch
         function onDrawModeChanged() {
-            Ranch.setExclusiveKeyboard(win, Ranch.drawMode);
+            Ranch.setDrawing(win, Ranch.drawMode);
             if (Ranch.drawMode) {
                 drawLayer.forceActiveFocus();
             }

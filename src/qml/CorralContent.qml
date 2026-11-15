@@ -162,6 +162,7 @@ Item {
             y: Math.round((parent.height - height) / 2) // centred, on a whole pixel
             visible: !renameField.visible
             text: content.title
+            textFormat: Text.PlainText // names are data, never markup
             elide: Text.ElideRight
             font.bold: true
             // White with a soft shadow, like Plasma's desktop labels: readable on any

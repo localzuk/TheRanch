@@ -57,7 +57,12 @@ QVariant FolderModel::data(const QModelIndex &index, int role) const
         return e.name;
     case IconNameRole:
         // For .desktop launchers KFileItem reads their Icon= key.
-        return e.item.iconName();
+        // That key is free text: only a theme icon name or a local file may reach
+        // the view, never a URL it would go and fetch (e.g. Icon=https://…).
+        if (const QString icon = e.item.iconName(); !icon.contains(QLatin1String("://")) || icon.startsWith(QLatin1String("file://"))) {
+            return icon;
+        }
+        return QStringLiteral("unknown");
     case UrlRole:
         return e.item.url();
     case IsDirRole:

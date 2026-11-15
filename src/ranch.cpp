@@ -217,15 +217,22 @@ void Ranch::configureQuickOpenLayer(QQuickWindow *window)
     lsw->setActivateOnShow(true);
 }
 
-void Ranch::setExclusiveKeyboard(QQuickWindow *window, bool exclusive)
+void Ranch::setDrawing(QQuickWindow *window, bool drawing)
 {
-    if (auto *lsw = LayerShellQt::Window::get(window)) {
-        lsw->setKeyboardInteractivity(exclusive ? LayerShellQt::Window::KeyboardInteractivityExclusive
-                                                : LayerShellQt::Window::KeyboardInteractivityOnDemand);
-        if (exclusive) {
-            window->requestActivate();
-        }
+    auto *lsw = window ? LayerShellQt::Window::get(window) : nullptr;
+    if (!lsw) {
+        return;
     }
+    // The layer can change while the surface is mapped (Plasma's panels do the
+    // same). Exclusive keyboard is also only guaranteed on the top and overlay
+    // layers; on the bottom layer the compositor may ignore it.
+    lsw->setLayer(drawing ? LayerShellQt::Window::LayerOverlay : LayerShellQt::Window::LayerBottom);
+    lsw->setKeyboardInteractivity(drawing ? LayerShellQt::Window::KeyboardInteractivityExclusive
+                                          : LayerShellQt::Window::KeyboardInteractivityOnDemand);
+    if (drawing) {
+        window->requestActivate();
+    }
+    window->requestUpdate(); // a frame, so the new layer state is committed promptly
 }
 
 // ------------------------------------------------------------------- files
@@ -237,6 +244,9 @@ void Ranch::open(const QUrl &url)
 {
     auto *job = new KIO::OpenUrlJob(url);
     job->setRunExecutables(true); // .desktop launchers on the desktop must start their app
+    // Executable scripts and binaries ask "open or execute?" first, as in Dolphin,
+    // rather than running on a single click. Launchers are unaffected.
+    job->setShowOpenOrExecuteDialog(true);
     job->setUiDelegate(KIO::createDefaultJobUiDelegate(KJobUiDelegate::AutoHandlingEnabled, nullptr));
     job->start();
 }
@@ -254,11 +264,20 @@ bool Ranch::moveInto(const QVariantList &urls, const QUrl &dest)
 }
 
 // Folders whose contents The Ranch manages: the desktop itself and every corral.
+// Compared with symlinks resolved: ~/Desktop may itself be a link, and drags can
+// arrive with either spelling of the path.
+static QString canonicalDir(const QString &path)
+{
+    const QString canonical = QFileInfo(path).canonicalFilePath(); // empty if it doesn't exist
+    return canonical.isEmpty() ? QDir(path).absolutePath() : canonical;
+}
+
 static bool isDesktopTree(const QString &dirPath)
 {
-    const QString desktop = QDir(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)).absolutePath();
-    const QString root = QDir(GroupStore::ranchRoot()).absolutePath();
-    return dirPath == desktop || QFileInfo(dirPath).absolutePath() == root;
+    const QString dir = canonicalDir(dirPath);
+    const QString desktop = canonicalDir(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+    const QString root = canonicalDir(GroupStore::ranchRoot());
+    return dir == desktop || QFileInfo(dir).absolutePath() == root;
 }
 
 // Drags from the Plasma desktop can arrive with symlinks already resolved to their
@@ -300,7 +319,13 @@ bool Ranch::moveUrls(const QList<QUrl> &urls, const QUrl &dest)
     QList<QUrl> toMove;
     QList<QUrl> toLink;
     for (QUrl u : urls) {
-        if (u.isLocalFile()) {
+        if (!u.isLocalFile()) {
+            // Remote or virtual locations (sftp:, smb:, mtp:, trash:, …) are "elsewhere"
+            // too: a move would delete the original there, so link instead.
+            toLink << u;
+            continue;
+        }
+        {
             const QString dir = QFileInfo(u.toLocalFile()).absolutePath();
             if (!isDesktopTree(dir)) {
                 const QString link = findLinkTo(u.toLocalFile());
@@ -406,8 +431,16 @@ void Ranch::showFileMenu(const QVariantList &urlList, QQuickItem *item, QPointF 
     connect(menu, &QMenu::aboutToHide, this, [this] {
         setNativeMenuOpen(false);
     });
+    // Also when it goes away without ever hiding (it never got shown), or drawers
+    // would stay open for good waiting for a menu that isn't there.
+    connect(menu, &QObject::destroyed, this, [this] {
+        setNativeMenuOpen(false);
+    });
     setNativeMenuOpen(true);
     menu->popup(item->mapToGlobal(pos).toPoint());
+    if (!menu->isVisible()) {
+        menu->deleteLater();
+    }
 }
 
 // Called from a QML MouseArea once the pointer passes the drag threshold. QDrag::exec()
@@ -463,7 +496,7 @@ void Ranch::setupTray()
         setAllHidden(!m_allHidden);
     });
     connect(m_tray, &KStatusNotifierItem::secondaryActivateRequested, this, [this] {
-        setDrawMode(true);
+        setDrawMode(!m_drawMode); // again to cancel
     });
 
     // Keep the menu and tooltip current whenever anything they show changes, rather
@@ -480,6 +513,7 @@ void Ranch::setupTray()
     connect(m_store, &QAbstractItemModel::modelReset, this, refresh);
     connect(this, &Ranch::allHiddenChanged, this, refresh);
     connect(this, &Ranch::allLockedChanged, this, refresh);
+    connect(this, &Ranch::drawModeChanged, this, refresh);
     // Shortcuts changed in System Settings → Shortcuts.
     connect(KGlobalAccel::self(), &KGlobalAccel::globalShortcutChanged, this, refresh);
     rebuildTrayMenu();
@@ -497,6 +531,19 @@ bool Ranch::autostartEnabled()
         return false;
     }
     return !QString::fromUtf8(f.readAll()).contains(u"\nHidden=true"_s);
+}
+
+// A path as one argument of a .desktop Exec= line: quoted, with the characters the
+// Desktop Entry spec reserves inside quotes escaped, then backslashes doubled once
+// more for the string-value escaping every key goes through, and "%" (a field code
+// marker) doubled.
+static QString desktopExecQuote(const QString &path)
+{
+    QString out = path;
+    out.replace(u'\\', u"\\\\"_s).replace(u'"', u"\\\""_s).replace(u'`', u"\\`"_s).replace(u'$', u"\\$"_s);
+    out.replace(u'\\', u"\\\\"_s);
+    out.replace(u'%', u"%%"_s);
+    return u'"' + out + u'"';
 }
 
 void Ranch::setAutostartEnabled(bool enabled)
@@ -517,7 +564,7 @@ void Ranch::setAutostartEnabled(bool enabled)
             "Comment=Desktop icon corrals\n"
             "Exec=%1\n"
             "Icon=view-grid-symbolic\n"
-            "X-KDE-autostart-phase=2\n"_s.arg(QCoreApplication::applicationFilePath())
+            "X-KDE-autostart-phase=2\n"_s.arg(desktopExecQuote(QCoreApplication::applicationFilePath()))
                 .toUtf8());
     f.commit();
 }
@@ -554,9 +601,17 @@ void Ranch::rebuildTrayMenu()
     QMenu *menu = m_tray->contextMenu();
     menu->clear();
 
-    menu->addAction(QIcon::fromTheme(u"list-add"_s), i18n("New Corral…"), this, [this] {
-        setDrawMode(true);
-    });
+    // While drawing, the same item cancels: the draw overlay sits below application
+    // windows, so with the desktop covered there may be nowhere to press Esc.
+    if (m_drawMode) {
+        menu->addAction(QIcon::fromTheme(u"dialog-cancel"_s), i18n("Cancel New Corral"), this, [this] {
+            setDrawMode(false);
+        });
+    } else {
+        menu->addAction(QIcon::fromTheme(u"list-add"_s), i18n("New Corral…"), this, [this] {
+            setDrawMode(true);
+        });
+    }
 
     menu->addSeparator(); // (tray hosts drop QMenu section titles, so plain separator)
     if (corrals.isEmpty()) {
@@ -661,7 +716,7 @@ void Ranch::setupShortcuts()
     draw->setObjectName(u"draw-new-corral"_s);
     KGlobalAccel::self()->setGlobalShortcut(draw, QList<QKeySequence>{});
     connect(draw, &QAction::triggered, this, [this] {
-        setDrawMode(true);
+        setDrawMode(!m_drawMode); // again to cancel
     });
 
     m_quickOpenAction = new QAction(i18n("Quick Open"), this);

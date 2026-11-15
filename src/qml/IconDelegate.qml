@@ -52,6 +52,7 @@ Item {
             leftMargin: Kirigami.Units.smallSpacing; rightMargin: Kirigami.Units.smallSpacing
         }
         text: del.name
+        textFormat: Text.PlainText // names are data, never markup
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
         maximumLineCount: 2
@@ -69,7 +70,9 @@ Item {
         }
     }
 
-    QQC2.ToolTip.text: del.name
+    // The shared tooltip auto-detects markup and has no plain-text switch, so a name
+    // containing "<" is escaped (which also makes it parse as markup and show literally).
+    QQC2.ToolTip.text: del.name.indexOf("<") < 0 ? del.name : del.name.replace(/&/g, "&amp;").replace(/</g, "&lt;")
     QQC2.ToolTip.visible: mouse.containsMouse && !mouse.pressed
     QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
 
@@ -105,9 +108,14 @@ Item {
             dragStarted = true;
             // Blocks until the drop; the file is moved by whoever accepts it.
             Ranch.startDrag(del.owner.selectedUrls(), del.iconName, del.owner.iconSize);
-            // The native drag swallowed our release; reset the press state.
-            enabled = false;
-            enabled = true;
+            // The native drag swallowed our release; reset the press state. If the file
+            // was dropped somewhere else, its row (this delegate) was removed while
+            // the drag's event loop ran and there is nothing left to reset.
+            try {
+                enabled = false;
+                enabled = true;
+            } catch (e) {
+            }
         }
 
         // Open on single- or double-click according to the KDE setting

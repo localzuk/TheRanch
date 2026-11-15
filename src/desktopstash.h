@@ -36,8 +36,13 @@
 namespace DesktopStash
 {
 // Moves all corral contents to ~/Desktop. Safe to call when nothing is collected.
-// Returns the number of entries moved.
-int park();
+// Returns the number of entries moved. Dotfiles stay where they are: they were never
+// shown as icons, and the desktop doesn't show them either.
+// With `ownerPid` (the guard passes the app it watched), parks only if the
+// "collected" marker was written by that process, and returns -1 otherwise: a newer
+// instance may have started and collected already, and its files are not ours to move.
+// If the record can't be written, the moves are undone and 0 is returned.
+int park(qint64 ownerPid = 0);
 
 // Moves parked files back into their corrals. Only corrals in `knownIds` are
 // collected into; files for unknown (deleted) corrals stay on the desktop.

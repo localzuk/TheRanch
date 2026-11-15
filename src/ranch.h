@@ -77,8 +77,11 @@ public:
     // Restricts pointer input to the union of rects ({x,y,width,height} in window coords).
     // Clicks outside fall through to whatever is underneath (the desktop or a window).
     Q_INVOKABLE void setInputRegion(QQuickWindow *window, const QVariantList &rects);
-    // Exclusive keyboard while drawing so Esc reaches us; on-demand otherwise.
-    Q_INVOKABLE void setExclusiveKeyboard(QQuickWindow *window, bool exclusive);
+    // Draw mode for a pasture window. While drawing it is lifted to the OVERLAY
+    // layer, above every window, so the draw overlay can be seen and reached with
+    // the desktop covered, and takes the keyboard so Esc reaches us. Afterwards it
+    // goes back to the BOTTOM layer with on-demand keyboard.
+    Q_INVOKABLE void setDrawing(QQuickWindow *window, bool drawing);
     // Turns a (not yet shown) window into the quick-open popup's surface: OVERLAY layer
     // (above everything, full-screen windows included), on the screen that has focus,
     // taking the keyboard so typing filters straight away.

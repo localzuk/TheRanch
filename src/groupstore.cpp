@@ -12,6 +12,8 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QFileInfo>
+#include <QImageReader>
 #include <QSet>
 
 #include <algorithm>
@@ -74,6 +76,28 @@ GroupStore::~GroupStore()
 QString GroupStore::ranchRoot()
 {
     return QStandardPaths::writableLocation(QStandardPaths::DesktopLocation) + u"/.ranch"_s;
+}
+
+bool GroupStore::isValidId(const QString &id)
+{
+    return !id.isEmpty() && !id.startsWith(u'.') && !id.contains(u'/') && !id.contains(QChar(u'\0'));
+}
+
+QString GroupStore::ownedBackground(const QString &path)
+{
+    if (path.isEmpty()) {
+        return {};
+    }
+    // Compared by folder, after resolving "..": a prefix test would also accept
+    // ".../backgrounds-other/x" and ".../backgrounds/../x".
+    const QString clean = QDir::cleanPath(path);
+    return QFileInfo(clean).absolutePath() == QDir::cleanPath(backgroundsDir()) ? clean : QString();
+}
+
+QSize GroupStore::imageSize(const QUrl &image) const
+{
+    const QString path = image.toLocalFile();
+    return path.isEmpty() ? QSize() : QImageReader(path).size();
 }
 
 QString GroupStore::configPath()
@@ -221,7 +245,7 @@ void GroupStore::setValue(const QString &id, const QString &key, const QVariant 
         // Only ever point at our own imported copies (or nothing). This also stops
         // pruneBackgrounds() from being asked to manage files we don't own.
         const QString path = value.typeId() == QMetaType::QUrl ? value.toUrl().toLocalFile() : value.toString();
-        c.bgImage = path.startsWith(backgroundsDir()) ? path : QString();
+        c.bgImage = ownedBackground(path);
         break;
     }
     case BgFillRole: c.bgFill = value.toString(); break;
@@ -246,7 +270,7 @@ void GroupStore::setValue(const QString &id, const QString &key, const QVariant 
 void GroupStore::setAllDrawerLayers(const QString &layer)
 {
     for (const Corral &c : std::as_const(m_corrals)) {
-        if (c.drawerLayer != layer) {
+        if (!c.dock.isEmpty() && c.drawerLayer != layer) {
             setValue(c.id, u"drawerLayer"_s, layer);
         }
     }
@@ -283,6 +307,12 @@ void GroupStore::remove(const QString &id)
     QList<QUrl> urls;
     const auto entries = dir.entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
     for (const QFileInfo &fi : entries) {
+        // Dolphin's view settings for this folder, not one of the user's files. Moving
+        // it would clash with (or replace) the desktop's own, so it goes with the folder.
+        if (fi.fileName() == u".directory"_s && fi.isFile() && !fi.isSymLink()) {
+            QFile::remove(fi.absoluteFilePath());
+            continue;
+        }
         urls << QUrl::fromLocalFile(fi.absoluteFilePath());
     }
     if (urls.isEmpty()) {
@@ -295,11 +325,18 @@ void GroupStore::remove(const QString &id)
         });
     }
 
+    // Only this corral's own image goes now. A full pruneBackgrounds() here could
+    // delete the image a Background dialog open on *another* corral would restore on
+    // Cancel; anything else left over is cleared at the next start.
+    const QString ownImage = ownedBackground(m_corrals.at(row).bgImage);
+
     beginRemoveRows({}, row, row);
     m_corrals.removeAt(row);
     endRemoveRows();
     Q_EMIT countChanged();
-    pruneBackgrounds();
+    if (!ownImage.isEmpty()) {
+        QFile::remove(ownImage);
+    }
     scheduleSave();
 }
 
@@ -334,7 +371,8 @@ bool GroupStore::importBackground(const QString &id, const QUrl &image)
 // Deletes imported images no corral refers to any more.
 // Deliberately NOT run after every change: the Background dialog's Cancel restores the
 // previous bgImage, so that file must still exist until the dialog is done. Running
-// at start-up and on corral removal is enough to stop the folder growing forever.
+// at start-up (remove() deletes the removed corral's own image) is enough to stop
+// the folder growing forever.
 void GroupStore::pruneBackgrounds()
 {
     QSet<QString> used;
@@ -367,7 +405,21 @@ void GroupStore::load()
     if (!f.open(QIODevice::ReadOnly)) {
         return;
     }
-    const QJsonObject root = QJsonDocument::fromJson(f.readAll()).object();
+    const QByteArray raw = f.readAll();
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(raw, &parseError);
+    if (!raw.trimmed().isEmpty() && (parseError.error != QJsonParseError::NoError || !doc.isObject())) {
+        // Unreadable settings (a hand-edit typo, a damaged file). We carry on with
+        // none, and the next save replaces the file, so keep the original beside it:
+        // fixing and renaming it back restores every corral's settings.
+        const QString backup = configPath() + u".broken-"_s + QString::number(QDateTime::currentSecsSinceEpoch());
+        if (QFile::copy(configPath(), backup)) {
+            qWarning() << "GroupStore: could not parse" << configPath() << ':' << parseError.errorString() << "- original kept as" << backup;
+        } else {
+            qWarning() << "GroupStore: could not parse" << configPath() << ':' << parseError.errorString() << "- and could not back it up";
+        }
+    }
+    const QJsonObject root = doc.object();
     // Migration: older versions had an app-wide "drawersOnTop" default that drawers
     // set to "default" followed. Each such drawer now gets that value as its own.
     const bool legacyOnTop = root.value(u"drawersOnTop").toBool(true);
@@ -376,7 +428,10 @@ void GroupStore::load()
         const QJsonObject o = v.toObject();
         Corral c;
         c.id = o.value(u"id").toString();
-        if (c.id.isEmpty()) {
+        if (!isValidId(c.id)) {
+            if (!c.id.isEmpty()) {
+                qWarning() << "GroupStore: ignoring corral with invalid id" << c.id;
+            }
             continue;
         }
         c.title = o.value(u"title").toString();
@@ -388,18 +443,20 @@ void GroupStore::load()
         c.screen = o.value(u"screen").toString();
         c.x = o.value(u"x").toDouble(c.x);
         c.y = o.value(u"y").toDouble(c.y);
-        c.width = o.value(u"width").toDouble(c.width);
-        c.height = o.value(u"height").toDouble(c.height);
-        c.dock = o.value(u"dock").toString();
+        // Values below are range-checked: the file may have been edited by hand.
+        c.width = std::max(120.0, o.value(u"width").toDouble(c.width)); // the smallest corral that can be drawn
+        c.height = std::max(90.0, o.value(u"height").toDouble(c.height));
+        const QString dock = o.value(u"dock").toString();
+        c.dock = QStringList{u"left"_s, u"right"_s, u"top"_s, u"bottom"_s}.contains(dock) ? dock : QString();
         c.dockOffset = o.value(u"dockOffset").toDouble(c.dockOffset);
-        c.iconSize = o.value(u"iconSize").toInt(c.iconSize);
-        c.bgMode = o.value(u"bgMode").toString(c.bgMode);
-        c.bgImage = o.value(u"bgImage").toString();
+        c.iconSize = std::clamp(o.value(u"iconSize").toInt(c.iconSize), 16, 256);
+        c.bgMode = o.value(u"bgMode").toString() == u"image"_s ? u"image"_s : u"color"_s;
+        c.bgImage = ownedBackground(o.value(u"bgImage").toString());
         c.bgFill = o.value(u"bgFill").toString(c.bgFill);
-        c.bgImageOpacity = o.value(u"bgImageOpacity").toDouble(c.bgImageOpacity);
+        c.bgImageOpacity = std::clamp(o.value(u"bgImageOpacity").toDouble(c.bgImageOpacity), 0.0, 1.0);
         c.overlayEnabled = o.value(u"overlayEnabled").toBool(false);
         c.overlayColor = QColor::fromString(o.value(u"overlayColor").toString(c.overlayColor.name(QColor::HexArgb)));
-        c.overlayOpacity = o.value(u"overlayOpacity").toDouble(c.overlayOpacity);
+        c.overlayOpacity = std::clamp(o.value(u"overlayOpacity").toDouble(c.overlayOpacity), 0.0, 1.0);
         const QString layer = o.value(u"drawerLayer").toString(u"default"_s);
         c.drawerLayer = layer == u"top"_s || layer == u"bottom"_s ? layer : (legacyOnTop ? u"top"_s : u"bottom"_s);
         QDir().mkpath(ranchRoot() + u'/' + c.id); // recreate if someone deleted it

@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Window
 import org.kde.kirigami as Kirigami
+import org.theranch.core
 
 // Paints a corral's background: a colour, or an image with an optional colour
 // overlay. Used by free corrals, drawers and the Background dialog's preview, so
@@ -58,26 +59,75 @@ Item {
 
         Image {
             id: img
-            // Crop and Fit can be decoded at (about) the size they're shown at: a 4K
-            // photo in a 300 px corral then costs ~0.3 MB instead of ~33 MB. Stretch,
-            // Tile and Centre need the image's natural size, so they're left alone.
-            readonly property bool decodeAtDisplaySize: bg.corral.bgFill === "crop" || bg.corral.bgFill === "fit"
+            // Never hold more pixels than can be shown: a 4K photo in a 300 px corral
+            // then costs ~0.3 MB instead of ~33 MB. How depends on the fit mode:
+            //   crop, fit      decoded at the size it's shown at (Qt works out the
+            //                  right size for cropping/fitting from the box we give);
+            //   stretch        decoded just big enough to cover the box. sourceSize
+            //                  keeps the aspect ratio, so the box itself would leave
+            //                  one axis short and soft;
+            //   tile, center   drawn 1:1, so the size can't change, but only the part
+            //                  behind the corral is ever visible: decode just that.
+            // The last two need the file's own size, read from its header in C++.
+            readonly property string fill: bg.corral.bgFill
+            readonly property bool boxed: fill === "crop" || fill === "fit"
+            readonly property bool oneToOne: fill === "tile" || fill === "center"
+            readonly property size natural: bg.imageMode && bg.visible && !boxed ? Corrals.imageSize(bg.corral.bgImage)
+                                                                               : Qt.size(0, 0)
+            readonly property bool naturalKnown: natural.width > 0 && natural.height > 0
+
             anchors.fill: parent
             // Only loaded while actually visible (not in hidden copies of this corral,
-            // or while its drawer is closed).
-            source: bg.imageMode && bg.visible ? bg.corral.bgImage : ""
-            fillMode: bg.fillModeFor(bg.corral.bgFill)
+            // or while its drawer is closed), and once we know how big we are.
+            source: bg.imageMode && bg.visible && settled.width > 0 ? bg.corral.bgImage : ""
+            fillMode: bg.fillModeFor(fill)
             horizontalAlignment: Image.AlignHCenter
             verticalAlignment: Image.AlignVCenter
             opacity: bg.corral.bgImageOpacity
-            sourceSize: decodeAtDisplaySize
-                        ? Qt.size(Math.ceil(width * Screen.devicePixelRatio), Math.ceil(height * Screen.devicePixelRatio))
-                        : undefined
+
+            // Our size in logical pixels, but only once it has stopped changing: bound
+            // directly, every pixel of a resize drag would re-read and re-decode the
+            // file. Meanwhile the current texture is simply scaled.
+            property size settled: Qt.size(0, 0)
+            function settle() {
+                if (width > 0 && height > 0) settled = Qt.size(Math.ceil(width), Math.ceil(height));
+            }
+            function sizeChanged() {
+                if (settled.width > 0) settleTimer.restart(); else settle(); // first time: no wait
+            }
+            onWidthChanged: sizeChanged()
+            onHeightChanged: sizeChanged()
+            Component.onCompleted: settle()
+            Timer {
+                id: settleTimer
+                interval: 200
+                onTriggered: img.settle()
+            }
+
+            sourceSize: {
+                const dpr = Screen.devicePixelRatio;
+                const w = Math.ceil(settled.width * dpr), h = Math.ceil(settled.height * dpr);
+                if (boxed) return Qt.size(w, h);
+                if (fill === "stretch" && naturalKnown) {
+                    const scale = Math.max(w / natural.width, h / natural.height);
+                    if (scale < 1) return Qt.size(Math.ceil(natural.width * scale), Math.ceil(natural.height * scale));
+                }
+                return undefined; // the file's own size
+            }
+            // Tile and Centre show the image centred at its own size, so whatever lies
+            // beyond the corral on an axis is cut off: leave exactly that out.
+            sourceClipRect: {
+                if (!oneToOne || !naturalKnown || (natural.width <= settled.width && natural.height <= settled.height)) {
+                    return undefined;
+                }
+                const w = Math.min(natural.width, settled.width), h = Math.min(natural.height, settled.height);
+                return Qt.rect(Math.floor((natural.width - w) / 2), Math.floor((natural.height - h) / 2), w, h);
+            }
             asynchronous: true
             smooth: true
-            // Mipmaps (+33% memory) only help when shrinking a large image on screen,
-            // which decoding at display size already avoids.
-            mipmap: !decodeAtDisplaySize
+            // No mipmaps (+33% memory): they only help when a large texture is drawn
+            // much smaller, which none of the modes above leaves us doing.
+            mipmap: false
             clip: true
         }
 

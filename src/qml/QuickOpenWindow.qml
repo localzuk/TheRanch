@@ -276,6 +276,7 @@ Window {
                                 Kirigami.Heading {
                                     level: 5
                                     text: sec.title !== "" ? sec.title : i18n("(untitled)")
+                                    textFormat: Text.PlainText // names are data, never markup
                                     elide: Text.ElideRight
                                     Layout.maximumWidth: Math.round(sec.width * 0.7)
                                 }
@@ -318,7 +319,7 @@ Window {
                                         // Launcher-style: one click opens, whatever the double-click setting.
                                         onClicked: win.openUrl(url)
 
-                                        QQC2.ToolTip.text: name
+                                        QQC2.ToolTip.text: name.indexOf("<") < 0 ? name : name.replace(/&/g, "&amp;").replace(/</g, "&lt;") // see IconDelegate
                                         QQC2.ToolTip.visible: hovered
                                         QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
 
@@ -339,6 +340,7 @@ Window {
                                                     left: parent.left; right: parent.right
                                                 }
                                                 text: cell.name
+                                                textFormat: Text.PlainText // names are data, never markup
                                                 horizontalAlignment: Text.AlignHCenter
                                                 wrapMode: Text.Wrap
                                                 maximumLineCount: 2
