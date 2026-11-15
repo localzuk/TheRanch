@@ -12,11 +12,13 @@ Push one against a screen edge and it becomes a slide-out drawer.
   has its own title, background (a colour or an image with transparency and an
   optional colour overlay), icon size, and lock. Corrals keep the size you drew;
   icons that don't fit go onto further pages.
+
   ![Desktop Corrals](images/Corrals.png)
 - **Drawers:** drag a corral to a screen edge and it docks there as a drawer with a
   divider-style tab. Hover or click the tab to slide it out over your windows (or
   keep it below them, per drawer). Resize it in place, or tear it off again in one
   drag.
+
   ![Desktop Drawers](images/Tray.png)
 - **Quick open:** one global shortcut pops up a launcher in the middle of the
   screen, over your windows, with every corral's icons in a section per corral;
