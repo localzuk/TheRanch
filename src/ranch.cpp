@@ -293,7 +293,7 @@ static QString findLinkTo(const QString &path)
     }
     QStringList dirs{QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)};
     const QDir root(GroupStore::ranchRoot());
-    for (const QString &d : root.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+    for (const QString &d : root.entryList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks)) {
         dirs << root.filePath(d);
     }
     for (const QString &dir : std::as_const(dirs)) {

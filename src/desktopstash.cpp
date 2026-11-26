@@ -187,7 +187,9 @@ int park(qint64 ownerPid)
     const QDir root(GroupStore::ranchRoot());
     int moved = 0;
 
-    const auto corralDirs = root.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    // NoSymLinks: a symlink in .ranch isn't a corral we made, and following it would
+    // empty the folder it points at onto the desktop.
+    const auto corralDirs = root.entryList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks);
     for (const QString &id : corralDirs) {
         const QDir dir(root.filePath(id));
         QJsonArray entries = parked.value(id).toArray();
@@ -348,7 +350,10 @@ int collect(const QStringList &knownIds)
             const QString current = byInode[ino].at(match).name;
             const QString src = desktop + u'/' + current;
             // Back under its corral name, unless the user renamed it meanwhile.
-            const QString wanted = current == e.value(u"name").toString() ? e.value(u"origName").toString() : current;
+            // The recorded name is only trusted if it's a plain name in this folder (no
+            // "/" or ".."); otherwise the file keeps its current desktop name.
+            const QString origName = e.value(u"origName").toString();
+            const QString wanted = current == e.value(u"name").toString() && GroupStore::isValidId(origName) ? origName : current;
             const QString dest = corralDir + u'/' + freeName(corralDir, wanted);
             if (moveEntry(src, dest)) {
                 byInode[ino].removeAt(match);

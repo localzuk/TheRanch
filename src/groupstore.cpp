@@ -467,7 +467,7 @@ void GroupStore::load()
 void GroupStore::recoverOrphans()
 {
     const QDir root(ranchRoot());
-    const auto dirs = root.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    const auto dirs = root.entryList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks); // see DesktopStash::park
     qreal offset = 0;
     for (const QString &name : dirs) {
         if (indexOf(name) >= 0) {

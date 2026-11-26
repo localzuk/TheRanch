@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 cmake_minimum_required(VERSION 3.20)
-project(theranch VERSION 0.1.1 LANGUAGES CXX)
+project(theranch VERSION 0.1.2 LANGUAGES CXX)
 
 # Qt 6.10: QSortFilterProxyModel::begin/endFilterChange. KF 6.10: KLocalization QML
 # context. LayerShellQt 6.8: matches the Plasma release this targets (Wayland-only).
