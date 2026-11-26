@@ -292,3 +292,10 @@ The Ranch is free software, licensed under the **GNU General Public License,
 version 3 or (at your option) any later version** (GPL-3.0-or-later). Every file
 carries an SPDX licence identifier saying so. The full licence text is in
 [LICENSE](LICENSE).
+
+The Ranch is built on Qt, KDE Frameworks (KCoreAddons, KI18n, KIO, KDBusAddons,
+KGlobalAccel, KStatusNotifierItem, KConfig, KXmlGui, Kirigami, QQC2 Desktop Style)
+and LayerShellQt, each used under its own (L)GPL licence. **About The Ranch →
+Libraries** credits each one, with its copyright, licence terms, the full licence
+texts and a link to its website. When adding a dependency, add it to
+`src/aboutlibraries.cpp` too.

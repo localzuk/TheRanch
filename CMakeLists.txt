@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 cmake_minimum_required(VERSION 3.20)
-project(theranch VERSION 0.1.0 LANGUAGES CXX)
+project(theranch VERSION 0.1.1 LANGUAGES CXX)
 
 # Qt 6.10: QSortFilterProxyModel::begin/endFilterChange. KF 6.10: KLocalization QML
 # context. LayerShellQt 6.8: matches the Plasma release this targets (Wayland-only).
@@ -44,6 +44,7 @@ qt_add_executable(theranch
     src/pagemodel.cpp    src/pagemodel.h
     src/namefiltermodel.cpp src/namefiltermodel.h
     src/desktopstash.cpp src/desktopstash.h
+    src/aboutlibraries.cpp src/aboutlibraries.h
 )
 
 qt_add_qml_module(theranch
@@ -69,6 +70,8 @@ qt_add_qml_module(theranch
 
 # Single source of truth for the version shown by `theranch --version`.
 target_compile_definitions(theranch PRIVATE THERANCH_VERSION="${PROJECT_VERSION}")
+# Shown in the About dialog's Libraries tab (LayerShellQt has no version header).
+target_compile_definitions(theranch PRIVATE THERANCH_LAYERSHELLQT_VERSION="${LayerShellQt_VERSION}")
 
 target_link_libraries(theranch PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2

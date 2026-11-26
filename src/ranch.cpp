@@ -5,6 +5,7 @@
 // (KIO), native menus and drags, then the tray icon, global shortcuts and quick open.
 
 #include "ranch.h"
+#include "aboutlibraries.h"
 #include "groupstore.h"
 
 #include <KAboutApplicationDialog>
@@ -39,6 +40,7 @@
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QStandardPaths>
+#include <QTabWidget>
 
 using namespace Qt::StringLiterals;
 
@@ -757,9 +759,11 @@ void Ranch::showShortcutsDialog()
     m_shortcutsDialog->configure(true); // non-modal: shows and returns
 }
 
-// KDE's standard About dialog (About / Author / Licence tabs and the bug-report
-// link), filled from the KAboutData set up in main.cpp. One at a time: choosing the
-// menu item again just brings the open dialog forward.
+// KDE's standard About dialog (About / Components / Author tabs, the licence link and
+// the bug-report link), filled from the KAboutData set up in main.cpp, plus our own
+// "Libraries" tab crediting every third-party library and its licences (see
+// aboutlibraries.h). One at a time: choosing the menu item again just brings the
+// open dialog forward.
 void Ranch::showAbout()
 {
     if (m_about) {
@@ -769,5 +773,13 @@ void Ranch::showAbout()
     }
     m_about = new KAboutApplicationDialog(KAboutData::applicationData());
     m_about->setAttribute(Qt::WA_DeleteOnClose);
+    // KAboutApplicationDialog has no API for extra tabs, but is built around a single
+    // QTabWidget. Insert after "Components" (index 1), which stays: its platform
+    // details and "Copy to Clipboard" are what bug reports need.
+    if (auto *tabs = m_about->findChild<QTabWidget *>()) {
+        tabs->insertTab(2, AboutLibraries::createPage(tabs), i18nc("@title:tab", "Libraries"));
+    } else {
+        qWarning("About dialog has no tab widget; the Libraries tab is missing");
+    }
     m_about->show();
 }
