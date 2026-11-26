@@ -277,6 +277,7 @@ include your Plasma and Qt versions and the output of
 | `src/desktopstash.*` | Returning icons to the desktop when not running, and the crash guard |
 | `src/foldermodel.*`, `src/pagemodel.*`, `src/namefiltermodel.*` | Folder listing, pagination and quick-open filter models |
 | `src/qml/` | The user interface |
+| `icons/` | The app icon and its monochrome tray version |
 | `install.sh`, `uninstall.sh` | Per-user install and removal |
 | `DESIGN.md` | Design notes and rationale |
 

@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     about.setBugAddress("https://github.com/localzuk/TheRanch/issues");
     about.setDesktopFileName(u"org.theranch"_s);
     KAboutData::setApplicationData(about);
-    QApplication::setWindowIcon(QIcon::fromTheme(u"view-grid-symbolic"_s));
+    QApplication::setWindowIcon(QIcon::fromTheme(u"org.theranch"_s, QIcon::fromTheme(u"view-grid-symbolic"_s)));
 
     QCommandLineParser parser;
     const QCommandLineOption newCorral(u"new-corral"_s, i18n("Start drawing a new corral."));

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Tony Ayre <me@tonyayre.net> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The Ranch tray icon: three titled corrals. Monochrome; Plasma recolours it
+     to match the panel through the ColorScheme-Text class. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <style id="current-color-scheme" type="text/css">.ColorScheme-Text { color: #232629; }</style>
+  <path class="ColorScheme-Text" fill="currentColor" fill-rule="evenodd"
+        d="M2 1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm0 3v2h4V4z
+           M2 9h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zm0 3v2h4v-2z
+           M10 1h4a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm0 3v10h4V4z
+           M11 5h2v2h-2zm0 4h2v2h-2z"/>
+</svg>

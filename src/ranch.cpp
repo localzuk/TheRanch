@@ -484,7 +484,7 @@ void Ranch::setupTray()
 {
     m_tray = new KStatusNotifierItem(u"theranch"_s, this);
     m_tray->setTitle(i18n("The Ranch"));
-    m_tray->setIconByName(u"view-grid-symbolic"_s);
+    m_tray->setIconByName(u"org.theranch-symbolic"_s);
     m_tray->setCategory(KStatusNotifierItem::ApplicationStatus);
     m_tray->setStatus(KStatusNotifierItem::Active);
     // We supply our own Quit so the menu layout is entirely ours.
@@ -565,7 +565,7 @@ void Ranch::setAutostartEnabled(bool enabled)
             "Name=The Ranch\n"
             "Comment=Desktop icon corrals\n"
             "Exec=%1\n"
-            "Icon=view-grid-symbolic\n"
+            "Icon=org.theranch\n"
             "X-KDE-autostart-phase=2\n"_s.arg(desktopExecQuote(QCoreApplication::applicationFilePath()))
                 .toUtf8());
     f.commit();
@@ -593,7 +593,7 @@ void Ranch::rebuildTrayMenu()
             summary += i18nc("appended to corral count", ", %1 hidden", hiddenCount);
         }
     }
-    m_tray->setToolTip(u"view-grid-symbolic"_s,
+    m_tray->setToolTip(u"org.theranch"_s,
                        i18n("The Ranch"),
                        summary + u"<br/>"_s + i18n("Click to show or hide all · Middle-click for a new corral"));
     m_tray->setOverlayIconByName(m_allHidden ? u"view-hidden"_s : QString());

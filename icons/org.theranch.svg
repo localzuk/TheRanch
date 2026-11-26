@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Tony Ayre <me@tonyayre.net> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The Ranch application icon: a desktop with three titled corrals of icons. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <!-- desktop: shadow, lower and upper halves -->
+  <rect x="4" y="6" width="40" height="38" rx="4" fill="#000" opacity="0.15"/>
+  <rect x="4" y="5" width="40" height="38" rx="4" fill="#1d99f3"/>
+  <path d="M8 5h32a4 4 0 0 1 4 4v15H4V9a4 4 0 0 1 4-4z" fill="#3daee9"/>
+  <!-- top-left corral -->
+  <rect x="8" y="10" width="15" height="13" rx="2" fill="#fcfcfc" opacity="0.94"/>
+  <path d="M10 10h11a2 2 0 0 1 2 2v1H8v-1a2 2 0 0 1 2-2z" fill="#fdbc4b"/>
+  <rect x="10.5" y="15.5" width="4" height="4" rx="1" fill="#da4453"/>
+  <rect x="16.5" y="15.5" width="4" height="4" rx="1" fill="#27ae60"/>
+  <!-- bottom-left corral -->
+  <rect x="8" y="26" width="15" height="12" rx="2" fill="#fcfcfc" opacity="0.94"/>
+  <path d="M10 26h11a2 2 0 0 1 2 2v1H8v-1a2 2 0 0 1 2-2z" fill="#27ae60"/>
+  <rect x="10.5" y="31" width="4" height="4" rx="1" fill="#1d99f3"/>
+  <!-- tall right corral -->
+  <rect x="26" y="10" width="14" height="28" rx="2" fill="#fcfcfc" opacity="0.94"/>
+  <path d="M28 10h10a2 2 0 0 1 2 2v1H26v-1a2 2 0 0 1 2-2z" fill="#9b59b6"/>
+  <rect x="28.5" y="15.5" width="4" height="4" rx="1" fill="#1abc9c"/>
+  <rect x="33.5" y="15.5" width="4" height="4" rx="1" fill="#f67400"/>
+  <rect x="28.5" y="22" width="4" height="4" rx="1" fill="#3daee9"/>
+  <rect x="33.5" y="22" width="4" height="4" rx="1" fill="#fdbc4b"/>
+</svg>

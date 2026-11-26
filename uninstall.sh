@@ -21,6 +21,8 @@ rmdir "$HOME/Desktop/.ranch" 2>/dev/null || true
 
 rm -f "$BIN" \
       "$PREFIX/share/applications/org.theranch.desktop" \
+      "$PREFIX/share/icons/hicolor/scalable/apps/org.theranch.svg" \
+      "$PREFIX/share/icons/hicolor/scalable/apps/org.theranch-symbolic.svg" \
       "$HOME/.config/autostart/org.theranch.desktop"
 
 if [[ "${1:-}" == "--purge" ]]; then

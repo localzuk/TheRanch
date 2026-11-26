@@ -82,5 +82,8 @@ target_link_libraries(theranch PRIVATE
 
 install(TARGETS theranch ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 install(FILES org.theranch.desktop DESTINATION ${KDE_INSTALL_APPDIR})
+# App icon (menu, About dialog) and its monochrome tray variant.
+install(FILES icons/org.theranch.svg icons/org.theranch-symbolic.svg
+        DESTINATION ${KDE_INSTALL_ICONDIR}/hicolor/scalable/apps)
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
